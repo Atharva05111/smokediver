@@ -239,3 +239,27 @@ body.sim .cam-label { position: static; display: block; background: none; color:
 @media (prefers-reduced-motion: reduce) {
   .radio-icon, .hud-row.whistle.alarm { animation: none; }
 }
+
+/* ---- Short windows (e.g. 1080p laptops at 125–150% scaling) ---- */
+@media (max-height: 780px) {
+  .dark { padding: 16px 24px; }
+  .board { padding: 16px; }
+  .board-frame { padding: 22px 30px 20px; border-width: 10px; }
+  .screen-title { font-size: 28px; margin-bottom: 10px; }
+  .wordmark { font-size: clamp(48px, 7vw, 76px); }
+  .calib { gap: 8px; }
+  .lede-dark { font-size: 16px; }
+  .calib-ring { width: 104px; height: 104px; }
+  #calib-count { font-size: 34px; }
+  .wave.big { height: 76px; }
+  .calib-read .num { font-size: 30px; }
+  .actions { margin-top: 14px; }
+  .hud { gap: 8px; padding: 10px 14px; }
+  .gauge { width: min(100%, 34vh); align-self: center; }
+  .big { font-size: 32px; }
+  .mid { font-size: 24px; }
+  .wave { height: 44px; }
+  .facts { gap: 8px; }
+  .stats .stat-v { font-size: 19px; }
+  .chart-wrap { height: 210px; }
+}
