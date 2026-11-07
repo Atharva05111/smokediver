@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; media-src blob: mediastream:; img-src 'self' data:; connect-src 'self';">
+  <title>SmokeDiver</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Title: the entry control board -------------------------------------->
+  <section class="screen board" id="s-title">
+    <div class="board-frame">
+      <div class="board-head">
+        <h1 class="wordmark">SmokeDiver</h1>
+        <p class="tagline">Breathing-apparatus air management, trained with your own breath.</p>
+      </div>
+      <div class="board-body">
+        <div class="board-col">
+          <p class="lede">Firefighters in smoke breathe from a cylinder that runs out. Panicked breathing empties it fast; slow, controlled breathing buys minutes. SmokeDiver reads your breathing, pulse and speech through your webcam and drains your cylinder in real time while you search a burning warehouse.</p>
+          <div class="actions">
+            <button class="btn primary" id="btn-live">Start with camera</button>
+            <button class="btn" id="btn-sim">Try the simulator</button>
+          </div>
+          <p class="note" id="key-note" hidden>No Presage API key found. Add <code>SMARTSPECTRA_API_KEY</code> to the <code>.env</code> file, then restart. The simulator works without one.</p>
+          <div class="links">
+            <button class="link" id="btn-history">Past runs</button>
+            <button class="link" id="btn-privacy">Privacy and data</button>
+          </div>
+        </div>
+        <div class="board-col tally-col">
+          <h2 class="board-label">Entry control</h2>
+          <div id="tally"></div>
+        </div>
+      </div>
+      <p class="board-foot">A training game, not a medical device and not a fitness-for-duty test.</p>
+    </div>
+  </section>
+
+  <!-- Consent ---------------------------------------------------------------->
+  <section class="screen board" id="s-consent" hidden>
+    <div class="board-frame narrow">
+      <h2 class="screen-title">Before the camera turns on</h2>
+      <ul class="facts">
+        <li><strong>What it reads.</strong> Your breathing (rate, depth, inhale and exhale timing), pulse, and whether your mouth is moving when you speak. Presage SmartSpectra measures these from the video of your face and upper chest.</li>
+        <li><strong>Where video goes.</strong> Frames are processed by the SmartSpectra SDK on this computer. SmokeDiver never records or saves video or images, and never opens your microphone.</li>
+        <li><strong>What leaves your computer.</strong> The SDK contacts Presage to check your API key and usage. SmokeDiver switches the SDK's optional telemetry off. While measuring, the SDK itself also sends derived numbers (pulse rate, heart-rate variability and breathing rate, never video) to Presage for its AI "insights" feature, about once a minute. SmokeDiver never requests or shows these insights and has no setting to stop them; Presage's privacy policy covers how long they are kept. Breathing-only mode below leaves out pulse and heart-rate variability.</li>
+        <li><strong>What is kept.</strong> After each run, a summary (pressure, breathing rate, pulse and score over time) is saved in this app's folder on your computer, so you can compare runs. You can delete it at any time from Past runs.</li>
+        <li><strong>One person only.</strong> Only point the camera at yourself. Don't use SmokeDiver to measure anyone without their knowledge.</li>
+        <li><strong>Not medical.</strong> Readings are camera estimates for a game. They don't diagnose anything and don't say whether you are fit for duty.</li>
+      </ul>
+      <label class="agree"><input type="checkbox" id="opt-breath-only"> Breathing-only mode: don't measure pulse (no heartbeat sound). Presage's documentation says its automatic insights need pulse data.</label>
+      <label class="agree"><input type="checkbox" id="agree"> I'm the person in front of the camera and I agree to this.</label>
+      <div class="actions">
+        <button class="btn primary" id="btn-consent" disabled>Turn on camera</button>
+        <button class="btn" data-go="s-title">Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mask check ------------------------------------------------------------->
+  <section class="screen dark" id="s-check" hidden>
+    <div class="check-layout">
+      <div class="preview-wrap">
+        <video id="preview" autoplay playsinline muted></video>
+        <div class="face-guide"></div>
+        <div class="preview-sim" id="preview-sim" hidden>Simulator: no camera in use</div>
+      </div>
+      <div class="check-side">
+        <h2 class="screen-title">Mask check</h2>
+        <p class="hint" id="check-hint">Starting the camera…</p>
+        <ol class="checks">
+          <li id="ck-face"><span class="tick"></span>Face and shoulders in view, evenly lit</li>
+          <li id="ck-breath"><span class="tick"></span>Breathing signal</li>
+          <li id="ck-pulse"><span class="tick"></span>Pulse signal</li>
+        </ol>
+        <p class="small">Sit about an arm's length from the camera with a light in front of you. Rest your arms and keep still; the game is played with the keyboard.</p>
+        <div class="error" id="check-error" hidden></div>
+        <div class="actions">
+          <button class="btn primary" id="btn-check-next" disabled>Continue</button>
+          <button class="btn" id="btn-check-retry" hidden>Try again</button>
+          <button class="btn ghost" id="btn-check-back">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Baseline breathing ------------------------------------------------------>
+  <section class="screen dark" id="s-calib" hidden>
+    <div class="calib">
+      <h2 class="screen-title">Pre-entry breathing check</h2>
+      <p class="lede-dark">Breathe normally for 30 seconds, the way you would sitting in the truck on the way to a job. This sets your baseline, so the cylinder drains by how you breathe compared to your own normal.</p>
+      <div class="calib-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="52" class="ring-fg" id="calib-ring"/></svg><span id="calib-count">30</span></div>
+      <canvas class="wave big" id="calib-wave"></canvas>
+      <div class="calib-read">
+        <div><span class="num" id="calib-rate">—</span><span class="unit">breaths/min</span></div>
+        <div><span class="num" id="calib-pulse">—</span><span class="unit">pulse, bpm</span></div>
+      </div>
+      <p class="small">The wave turns blue while you breathe in. If blue appears when you breathe out, <button class="link" id="btn-flip">flip the direction</button>.</p>
+      <div class="actions"><button class="btn primary" id="btn-calib-next" disabled>Continue to briefing</button></div>
+    </div>
+  </section>
+
+  <!-- Briefing ---------------------------------------------------------------->
+  <section class="screen board" id="s-brief" hidden>
+    <div class="board-frame narrow">
+      <h2 class="screen-title">Briefing</h2>
+      <dl class="brief">
+        <dt>Incident</dt><dd>Fire in a storage warehouse. One worker is unaccounted for, last seen near the rooms along the back wall.</dd>
+        <dt>Your set</dt><dd>300 bar cylinder. The low-pressure whistle sounds at 55 bar. When it does, you leave.</dd>
+        <dt>Your air</dt><dd>Drains with your real breathing. Slow, steady breaths with a long exhale stretch it furthest. Talking uses air too.</dd>
+        <dt>Radio</dt><dd>When entry control calls, answer out loud. SmokeDiver sees you speaking; it doesn't listen.</dd>
+        <dt>Way out</dt><dd>You lay a hose line as you go. Follow it back to the green exit.</dd>
+        <dt>Controls</dt><dd><kbd>W A S D</kbd> or arrow keys to move, <kbd>E</kbd> to pick up the casualty or leave at the exit, <kbd>M</kbd> sound on/off.</dd>
+      </dl>
+      <p class="baseline" id="baseline-line"></p>
+      <div class="actions">
+        <button class="btn primary" id="btn-go">Go in</button>
+        <button class="btn" id="btn-recalib">Redo breathing check</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mission ----------------------------------------------------------------->
+  <section class="screen mission" id="s-mission" hidden>
+    <div class="mission-main">
+      <div class="objective"><span id="h-objective"></span><span class="clock" id="h-clock">0:00</span></div>
+      <div class="stage">
+        <canvas id="world"></canvas>
+        <div class="radio" id="h-radio" hidden>
+          <div class="radio-head"><span class="radio-icon"></span><span id="h-radio-prompt"></span><span class="radio-timer" id="h-radio-timer"></span></div>
+          <div class="radio-line" id="h-radio-line"></div>
+          <div class="meter"><div class="meter-fill" id="h-radio-meter"></div></div>
+        </div>
+        <div class="pause" id="h-pause" hidden>
+          <p class="pause-title">Signal lost. Air and time are paused.</p>
+          <p id="h-pause-hint"></p>
+        </div>
+      </div>
+    </div>
+    <aside class="hud">
+      <canvas class="gauge" id="h-gauge"></canvas>
+      <div class="hud-row whistle" id="h-whistle-row"><span class="big" id="h-whistle-in">—</span><span class="lbl" id="h-whistle-label">Whistle in, at this breathing rate</span></div>
+      <div class="hud-pair">
+        <div><span class="mid" id="h-usage">—</span><span class="lbl">air use, L/min</span></div>
+        <div><span class="mid" id="h-rate">—</span><span class="lbl">breaths/min</span></div>
+      </div>
+      <div class="control">
+        <div class="control-top"><span class="lbl">Breath control</span><span class="mid-s" id="h-control-value">—</span></div>
+        <div class="bar" id="h-control-bar"><div class="bar-fill"></div></div>
+      </div>
+      <canvas class="wave" id="h-wave"></canvas>
+      <div class="hud-pair">
+        <div><span class="mid" id="h-pulse">—</span><span class="lbl">pulse, bpm</span></div>
+        <div class="talk"><span class="lamp" id="h-talk"></span><span class="lbl">speaking</span></div>
+      </div>
+      <div class="cam">
+        <video id="hud-video" autoplay playsinline muted></video>
+        <span class="cam-label" id="hud-source">Live · SmartSpectra</span>
+      </div>
+      <span class="mute" id="h-mute">Sound on</span>
+    </aside>
+  </section>
+
+  <!-- Debrief ----------------------------------------------------------------->
+  <section class="screen board" id="s-debrief" hidden>
+    <div class="board-frame wide">
+      <div class="debrief-head">
+        <div>
+          <h2 class="screen-title" id="d-title"></h2>
+          <p class="d-sub" id="d-sub"></p>
+        </div>
+        <div class="score"><span class="score-num" id="d-score"></span><span class="score-rank" id="d-rank"></span></div>
+      </div>
+      <div class="stats" id="d-stats"></div>
+      <div class="chart-wrap"><canvas id="d-chart"></canvas></div>
+      <div class="debrief-cols">
+        <div><h3>Radio log</h3><ul class="log" id="d-reports"></ul></div>
+        <div><h3>Timeline</h3><ul class="log" id="d-events"></ul></div>
+        <div><h3>Coaching</h3><ul class="log coach" id="d-coach"></ul></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btn-again">Go in again</button>
+        <button class="btn" data-go="s-title">Back to board</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- History ----------------------------------------------------------------->
+  <section class="screen board" id="s-history" hidden>
+    <div class="board-frame wide">
+      <h2 class="screen-title">Past runs</h2>
+      <p class="small dark-ink">Stored only on this computer. Each row is a summary; no video or images are ever saved.</p>
+      <div class="table-wrap"><table class="runs"><thead><tr><th>Date</th><th>Mode</th><th>Outcome</th><th>Time inside</th><th>Exit pressure</th><th>Air use</th><th>Breath control</th><th>Score</th></tr></thead><tbody id="runs-body"></tbody></table></div>
+      <div class="actions">
+        <button class="btn" data-go="s-title">Back</button>
+        <button class="btn danger" id="btn-clear">Delete all runs</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy ----------------------------------------------------------------->
+  <section class="screen board" id="s-privacy" hidden>
+    <div class="board-frame narrow">
+      <h2 class="screen-title">Privacy and data</h2>
+      <ul class="facts">
+        <li><strong>Camera.</strong> Only turns on after you agree, and only while you're on the mask check, breathing check or a mission. It turns off on the debrief and when you leave. Electron is set to grant this app camera access only, never the microphone.</li>
+        <li><strong>Processing.</strong> Presage's SmartSpectra SDK processes video frames on this computer. SmokeDiver keeps no video, images or face landmarks.</li>
+        <li><strong>Network.</strong> The SDK contacts Presage to validate your API key, check usage and load its models. SDK telemetry is switched off (<code>enableTelemetry: false</code>). Separately, Presage's SDK automatically sends snapshots of derived pulse rate, heart-rate variability and breathing rate (no video or images) to Presage's AI insights service while a session runs, roughly once a minute. SmokeDiver never asks for or displays insights and cannot turn these snapshots off; see Presage's privacy policy for retention and deletion. Breathing-only mode stops pulse being measured at all.</li>
+        <li><strong>Minimal camera time.</strong> The SDK is stopped as soon as a mission ends, so nothing is measured while you read the debrief or browse the board.</li>
+        <li><strong>Storage.</strong> Run summaries go to <code>runs.json</code> in this app's data folder (on Windows, under <code>%APPDATA%\SmokeDiver</code>). The last 50 runs are kept. Delete them from Past runs.</li>
+        <li><strong>Sharing.</strong> SmokeDiver sends nothing to anyone else.</li>
+        <li><strong>Not medical.</strong> Breathing and pulse are camera estimates used to drive a game. SmokeDiver makes no health claims and does not judge fitness for duty.</li>
+      </ul>
+      <div class="actions"><button class="btn" data-go="s-title">Back</button></div>
+    </div>
+  </section>
+
+</div>
+<script src="./dist/renderer.js"></script>
+</body>
+</html>

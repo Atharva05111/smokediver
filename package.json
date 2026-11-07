@@ -1,0 +1,23 @@
+{
+  "name": "smokediver",
+  "productName": "SmokeDiver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Breathing-apparatus air management trainer driven by live Presage SmartSpectra signals.",
+  "main": "main.js",
+  "author": "Atharva Dhamal",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild ./src/renderer/app.js --bundle --outfile=dist/renderer.js --platform=browser --format=iife --log-level=warning && esbuild ./src/preload.js --bundle --outfile=dist/preload.js --platform=node --format=cjs --external:electron --log-level=warning",
+    "start": "npm run build && electron .",
+    "sim": "npm run build && electron . --sim"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.4.0",
+    "chart.js": "^4.6.1"
+  },
+  "devDependencies": {
+    "electron": "^43.8.7",
+    "esbuild": "^0.25.12"
+  }
+}
